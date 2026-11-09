@@ -1,0 +1,31 @@
+[package]
+name = "ding-client"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+default-run = "ding"
+
+[lib]
+name = "ding_client"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ding"
+path = "src/bin/ding.rs"
+
+[[bin]]
+name = "ding-gui"
+path = "src/bin/ding-gui.rs"
+
+[dependencies]
+ding-shared.workspace = true
+ding-server.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
+mdns-sd.workspace = true
+# One window toolkit for Ubuntu and macOS. No web view, no per-platform UI kit.
+eframe = "0.33"
+# Plays a short synthesized ding. The same code path works on both desktops.
+rodio = "0.21"
