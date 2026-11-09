@@ -29,7 +29,7 @@ cd ding
 cargo run --release -p ding-client --bin ding-gui -- YourName
 ```
 
-Apple Silicon and Intel both work. Build on the Mac you will run it on, or grab the matching artifact below.
+Apple Silicon and Intel both work. Build on the Mac you will run it on, or grab the matching zip from [Releases](https://github.com/adel-hadadi/ding/releases).
 
 Leave off `YourName` and the window will ask.
 
@@ -41,17 +41,17 @@ Same crate, no window:
 cargo run --release -p ding-client --bin ding -- YourName
 ```
 
-## Prebuilt binaries (GitHub Actions)
+## Prebuilt binaries
 
-Every push to `main` builds release binaries and uploads them as artifacts:
+Tagged versions show up on [Releases](https://github.com/adel-hadadi/ding/releases). Each release has three zips:
 
-| Artifact | Who it’s for |
+| Zip | Who it’s for |
 | --- | --- |
-| `ding-linux-x64` | Ubuntu / other x86_64 Linux |
-| `ding-macos-arm64` | Apple Silicon (M1 and later) |
-| `ding-macos-x64` | Intel Macs |
+| `ding-linux-x64.zip` | Ubuntu / other x86_64 Linux |
+| `ding-macos-arm64.zip` | Apple Silicon (M1 and later) |
+| `ding-macos-x64.zip` | Intel Macs |
 
-Open the repo → **Actions** → latest green **Build** run → **Artifacts**, then unzip. Each zip has:
+Each zip has:
 
 - `ding-gui` — the window
 - `ding` — the terminal client
@@ -102,4 +102,9 @@ cargo build --release -p ding-client --bins
 
 Binaries land in `target/release/ding` and `target/release/ding-gui`.
 
-CI is the GitHub Action in `.github/workflows/build.yml`. It tests on Linux and builds Linux + macOS (Apple Silicon and Intel) release artifacts.
+CI is the GitHub Action in `.github/workflows/build.yml`. Pushes to `main` test and build. A tag like `v0.1.0` also publishes those zips on the Releases page:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```

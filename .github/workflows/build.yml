@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -92,3 +93,28 @@ jobs:
           name: ding-macos-x64
           path: dist-x64/
           if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [linux, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Zip each platform
+        run: |
+          mkdir -p dist
+          for name in ding-linux-x64 ding-macos-arm64 ding-macos-x64; do
+            (cd "artifacts/${name}" && zip -r "${GITHUB_WORKSPACE}/dist/${name}.zip" .)
+          done
+          ls -l dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
