@@ -1,4 +1,4 @@
-//! A tiny synthesized ding. No audio files, so the same beep works on Ubuntu and macOS.
+//! A tiny synthesized ding. No audio files, so the same beep works on Ubuntu, macOS, and Windows.
 //!
 //! Playback stays on its own thread. Opening the sound device can block, and the window
 //! thread should keep drawing.

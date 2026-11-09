@@ -102,9 +102,40 @@ jobs:
           path: dist-x64/
           if-no-files-found: error
 
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --workspace --locked
+
+      - name: Release build
+        run: |
+          cargo build --release --locked -p ding-client --bins
+          cargo build --release --locked -p ding-server
+
+      - name: Stage binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target/release/ding.exe, target/release/ding-gui.exe, target/release/ding-server.exe dist/
+          Copy-Item packaging/windows/install.ps1, packaging/windows/install.bat dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ding-windows-x64
+          path: dist/
+          if-no-files-found: error
+
   release:
     name: GitHub Release
-    needs: [linux, macos]
+    needs: [linux, macos, windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -118,7 +149,7 @@ jobs:
         run: |
           mkdir -p dist
           find artifacts/ding-linux-x64 -name '*.deb' -exec cp {} dist/ \;
-          for name in ding-linux-x64 ding-macos-arm64 ding-macos-x64; do
+          for name in ding-linux-x64 ding-macos-arm64 ding-macos-x64 ding-windows-x64; do
             (cd "artifacts/${name}" && zip -r "${GITHUB_WORKSPACE}/dist/${name}.zip" . -x '*.deb')
           done
           ls -l dist

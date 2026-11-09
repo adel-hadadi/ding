@@ -1,4 +1,6 @@
-//! A small window for Ding. egui draws it the same way on Ubuntu and macOS.
+//! A small window for Ding. egui draws it the same way on Ubuntu, macOS, and Windows.
+
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};

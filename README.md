@@ -6,7 +6,7 @@ No accounts. No database. Each app hosts its own little server and finds other p
 
 ## Install as an app
 
-After this, you open Ding from the Ubuntu app menu or macOS Launchpad. No terminal.
+After this, you open Ding from the Ubuntu app menu, macOS Launchpad, or the Windows Start menu. No terminal.
 
 ### Ubuntu
 
@@ -57,6 +57,24 @@ chmod +x packaging/macos/bundle.sh
 mv Ding.app /Applications/
 ```
 
+### Windows
+
+Unzip `ding-windows-x64.zip` from [Releases](https://github.com/adel-hadadi/ding/releases), then either:
+
+- Double-click `ding-gui.exe`, or
+- Double-click `install.bat` to put **Ding** in the Start menu
+
+The first launch may show SmartScreen. Choose **More info** → **Run anyway**. If Windows Firewall asks, allow it on **private** networks so teammates can find you.
+
+From source on a PC with [Rust](https://rustup.rs/):
+
+```powershell
+git clone https://github.com/adel-hadadi/ding.git
+cd ding
+cargo build --release -p ding-client --bins
+.\target\release\ding-gui.exe
+```
+
 ### Terminal client
 
 Same crate, no window:
@@ -75,6 +93,7 @@ Tagged versions show up on [Releases](https://github.com/adel-hadadi/ding/releas
 | `ding-linux-x64.zip` | Linux binaries + `install.sh` (no root) |
 | `ding-macos-arm64.zip` | Apple Silicon — `Ding.app` |
 | `ding-macos-x64.zip` | Intel Macs — `Ding.app` |
+| `ding-windows-x64.zip` | Windows — `ding-gui.exe` + `install.bat` |
 
 The zips also include the terminal `ding` binary and optional `ding-server`. The apps already embed a server.
 
@@ -114,7 +133,7 @@ sudo apt install ./dist/ding_*_amd64.deb
 
 Binaries land in `target/release/`. The `.deb` lands in `dist/`.
 
-CI is the GitHub Action in `.github/workflows/build.yml`. Pushes to `main` test and build. A tag like `v0.1.0` publishes the zips and the `.deb` on the Releases page:
+CI is the GitHub Action in `.github/workflows/build.yml`. Pushes to `main` test and build Linux, macOS, and Windows. A tag like `v0.1.0` publishes the zips, the `.deb`, and the Windows zip on the Releases page:
 
 ```bash
 git tag v0.1.0
