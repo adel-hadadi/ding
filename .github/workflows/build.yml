@@ -37,7 +37,12 @@ jobs:
         run: |
           mkdir -p dist
           cp target/release/ding target/release/ding-gui target/release/ding-server dist/
-          chmod +x dist/*
+          cp packaging/linux/com.adelhadadi.ding.desktop \
+             packaging/linux/com.adelhadadi.ding.svg \
+             packaging/linux/install.sh \
+             dist/
+          chmod +x dist/ding dist/ding-gui dist/ding-server dist/install.sh packaging/linux/build-deb.sh
+          packaging/linux/build-deb.sh dist
 
       - uses: actions/upload-artifact@v4
         with:
@@ -67,20 +72,23 @@ jobs:
           cargo build --release --locked --target x86_64-apple-darwin -p ding-client --bins
           cargo build --release --locked --target x86_64-apple-darwin -p ding-server
 
-      - name: Stage Apple Silicon binaries
+      - name: Stage Apple Silicon app
         run: |
           mkdir -p dist-arm64
-          cp target/release/ding target/release/ding-gui target/release/ding-server dist-arm64/
-          chmod +x dist-arm64/*
+          chmod +x packaging/macos/bundle.sh
+          packaging/macos/bundle.sh target/release/ding-gui dist-arm64/Ding.app
+          cp target/release/ding target/release/ding-server dist-arm64/
+          chmod +x dist-arm64/ding dist-arm64/ding-server
 
-      - name: Stage Intel binaries
+      - name: Stage Intel app
         run: |
           mkdir -p dist-x64
+          chmod +x packaging/macos/bundle.sh
+          packaging/macos/bundle.sh target/x86_64-apple-darwin/release/ding-gui dist-x64/Ding.app
           cp target/x86_64-apple-darwin/release/ding \
-             target/x86_64-apple-darwin/release/ding-gui \
              target/x86_64-apple-darwin/release/ding-server \
              dist-x64/
-          chmod +x dist-x64/*
+          chmod +x dist-x64/ding dist-x64/ding-server
 
       - uses: actions/upload-artifact@v4
         with:
@@ -109,12 +117,15 @@ jobs:
       - name: Zip each platform
         run: |
           mkdir -p dist
+          find artifacts/ding-linux-x64 -name '*.deb' -exec cp {} dist/ \;
           for name in ding-linux-x64 ding-macos-arm64 ding-macos-x64; do
-            (cd "artifacts/${name}" && zip -r "${GITHUB_WORKSPACE}/dist/${name}.zip" .)
+            (cd "artifacts/${name}" && zip -r "${GITHUB_WORKSPACE}/dist/${name}.zip" . -x '*.deb')
           done
           ls -l dist
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.deb
           generate_release_notes: true

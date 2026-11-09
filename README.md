@@ -4,11 +4,21 @@ A tiny desktop app for a headphone-wearing team. You show up on the local networ
 
 No accounts. No database. Each app hosts its own little server and finds other people with mDNS.
 
-## Install from source
+## Install as an app
 
-You need a recent [Rust](https://rustup.rs/) toolchain (`rustup` is enough).
+After this, you open Ding from the Ubuntu app menu or macOS Launchpad. No terminal.
 
 ### Ubuntu
+
+From a [Release](https://github.com/adel-hadadi/ding/releases), download `ding_*_amd64.deb` and install it:
+
+```bash
+sudo apt install ./ding_*_amd64.deb
+```
+
+Then search the app grid for **Ding** and click it. The window asks for your name.
+
+From source:
 
 ```bash
 sudo apt install pkg-config libasound2-dev
@@ -16,22 +26,36 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 git clone https://github.com/adel-hadadi/ding.git
 cd ding
-cargo run --release -p ding-client --bin ding-gui -- YourName
+cargo build --release -p ding-client --bins
+./packaging/linux/build-deb.sh
+sudo apt install ./dist/ding_*_amd64.deb
 ```
 
+Without sudo, `./packaging/linux/install.sh` copies the app into `~/.local` instead.
+
 ### macOS
+
+Unzip the matching release (`ding-macos-arm64` on Apple Silicon, `ding-macos-x64` on Intel):
+
+```bash
+xattr -dr com.apple.quarantine Ding.app
+mv Ding.app /Applications/
+```
+
+Open **Ding** from Launchpad or Applications. The first time, right-click → **Open**.
+
+From source on a Mac:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 git clone https://github.com/adel-hadadi/ding.git
 cd ding
-cargo run --release -p ding-client --bin ding-gui -- YourName
+cargo build --release -p ding-client --bin ding-gui
+chmod +x packaging/macos/bundle.sh
+./packaging/macos/bundle.sh target/release/ding-gui Ding.app
+mv Ding.app /Applications/
 ```
-
-Apple Silicon and Intel both work. Build on the Mac you will run it on, or grab the matching zip from [Releases](https://github.com/adel-hadadi/ding/releases).
-
-Leave off `YourName` and the window will ask.
 
 ### Terminal client
 
@@ -43,30 +67,16 @@ cargo run --release -p ding-client --bin ding -- YourName
 
 ## Prebuilt binaries
 
-Tagged versions show up on [Releases](https://github.com/adel-hadadi/ding/releases). Each release has three zips:
+Tagged versions show up on [Releases](https://github.com/adel-hadadi/ding/releases):
 
-| Zip | Who it’s for |
+| File | Who it’s for |
 | --- | --- |
-| `ding-linux-x64.zip` | Ubuntu / other x86_64 Linux |
-| `ding-macos-arm64.zip` | Apple Silicon (M1 and later) |
-| `ding-macos-x64.zip` | Intel Macs |
+| `ding_*_amd64.deb` | Ubuntu — `sudo apt install ./ding_*_amd64.deb` |
+| `ding-linux-x64.zip` | Linux binaries + `install.sh` (no root) |
+| `ding-macos-arm64.zip` | Apple Silicon — `Ding.app` |
+| `ding-macos-x64.zip` | Intel Macs — `Ding.app` |
 
-Each zip has:
-
-- `ding-gui` — the window
-- `ding` — the terminal client
-- `ding-server` — optional standalone server (the apps already embed one)
-
-```bash
-chmod +x ding-gui
-./ding-gui YourName
-```
-
-On a Mac the first launch is blocked as unsigned. Right-click the file → **Open**, or:
-
-```bash
-xattr -d com.apple.quarantine ding-gui ding ding-server
-```
+The zips also include the terminal `ding` binary and optional `ding-server`. The apps already embed a server.
 
 ## Using it
 
@@ -98,11 +108,13 @@ quit
 ```bash
 # Ubuntu also needs: sudo apt install pkg-config libasound2-dev
 cargo build --release -p ding-client --bins
+./packaging/linux/build-deb.sh
+sudo apt install ./dist/ding_*_amd64.deb
 ```
 
-Binaries land in `target/release/ding` and `target/release/ding-gui`.
+Binaries land in `target/release/`. The `.deb` lands in `dist/`.
 
-CI is the GitHub Action in `.github/workflows/build.yml`. Pushes to `main` test and build. A tag like `v0.1.0` also publishes those zips on the Releases page:
+CI is the GitHub Action in `.github/workflows/build.yml`. Pushes to `main` test and build. A tag like `v0.1.0` publishes the zips and the `.deb` on the Releases page:
 
 ```bash
 git tag v0.1.0

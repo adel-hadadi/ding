@@ -28,7 +28,8 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(Vec2::new(440.0, 700.0))
             .with_min_inner_size(Vec2::new(380.0, 520.0))
-            .with_title("Ding"),
+            .with_title("Ding")
+            .with_app_id("com.adelhadadi.ding"),
         vsync: true,
         ..Default::default()
     };

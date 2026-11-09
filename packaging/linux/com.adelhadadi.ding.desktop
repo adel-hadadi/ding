@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ding
+Comment=Ding a coworker on the local network
+Exec=ding-gui
+Icon=com.adelhadadi.ding
+Terminal=false
+Categories=Utility;Network;
+StartupWMClass=ding
+Keywords=bell;team;lan;
