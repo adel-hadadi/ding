@@ -23,8 +23,11 @@ ding-server.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
+serde = { workspace = true }
 serde_json.workspace = true
 mdns-sd.workspace = true
+# Local user profile (name, avatar, headphones, ding kind).
+rusqlite = { version = "0.32", features = ["bundled"] }
 # One window toolkit for Ubuntu, macOS, and Windows. No web view, no per-platform UI kit.
 eframe = "0.33"
 # Plays a short synthesized ding. The same code path works on all three desktops.

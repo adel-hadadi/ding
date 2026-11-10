@@ -12,7 +12,7 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 
-use crate::discovery::{describe_note, primary_ipv4, Lan, LanEvent, Peer};
+use crate::discovery::{describe_note, primary_ipv4, Lan, LanEvent, Peer, Presence};
 use crate::session::{direct_ding, spawn_team, TeamEvent, TeamNotice};
 
 pub struct Session {
@@ -61,6 +61,8 @@ pub enum Note {
 pub struct PeerRow {
     pub name: String,
     pub note: String,
+    pub headphones: bool,
+    pub avatar: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,12 +99,26 @@ pub enum Command {
         to: String,
         kind: String,
     },
+    /// Re-announce headphones / avatar on the LAN without restarting.
+    SetPresence {
+        headphones: bool,
+        avatar: String,
+    },
     Shutdown,
 }
 
 impl Session {
     /// Open our own ding port, announce it, and start listening.
     pub async fn boot(name: String) -> Result<Self, String> {
+        Self::boot_with(name, false, String::new()).await
+    }
+
+    /// Same as [`boot`](Self::boot), with headphones and avatar on the first announce.
+    pub async fn boot_with(
+        name: String,
+        headphones: bool,
+        avatar: String,
+    ) -> Result<Self, String> {
         let app = App::new(name.clone());
         let mut local_events = app.subscribe();
         let listener = TcpListener::bind("0.0.0.0:0")
@@ -139,7 +155,15 @@ impl Session {
         });
 
         let (lan_tx, mut lan_rx) = mpsc::unbounded_channel();
-        let lan = match Lan::start(&name, port, lan_tx) {
+        let lan = match Lan::start(
+            &name,
+            port,
+            Presence {
+                headphones,
+                avatar,
+            },
+            lan_tx,
+        ) {
             Ok(lan) => Some(lan),
             Err(err) => {
                 eprintln!("LAN discovery is off: {err}");
@@ -194,6 +218,8 @@ impl Session {
             .map(|peer| PeerRow {
                 name: peer.name.clone(),
                 note: describe_note(peer),
+                headphones: peer.headphones,
+                avatar: peer.avatar.clone(),
             })
             .collect();
         peers.sort_by_key(|peer| name_key(&peer.name));
@@ -210,6 +236,15 @@ impl Session {
                 joining: !team.saw_presence,
             }),
         }
+    }
+
+    pub fn set_presence(&mut self, headphones: bool, avatar: String) -> Vec<Note> {
+        if let Some(lan) = &mut self.lan {
+            if let Err(message) = lan.set_presence(headphones, avatar) {
+                return vec![Note::Status(format!("could not update presence: {message}"))];
+            }
+        }
+        Vec::new()
     }
 
     /// Read network events and window commands until `Shutdown` or the channels close.
@@ -385,6 +420,10 @@ impl Session {
             Command::JoinAddr { host, port, team } => self.join_addr(&host, port, &team).await,
             Command::Leave => self.leave(),
             Command::Ding { to, kind } => self.ding(&to, &kind),
+            Command::SetPresence {
+                headphones,
+                avatar,
+            } => self.set_presence(headphones, avatar),
             Command::Shutdown => self.shutdown(),
         }
     }
@@ -417,7 +456,7 @@ impl Session {
             generation,
         });
         let mut notes = Vec::new();
-        if let Some(lan) = &self.lan {
+        if let Some(lan) = &mut self.lan {
             if let Err(message) = lan.set_team(Some(&code), hosting) {
                 notes.push(Note::Status(format!("team announcement failed: {message}")));
             }
@@ -440,7 +479,7 @@ impl Session {
         if team.hosting {
             self.app.close_team(&team.code);
         }
-        if let Some(lan) = &self.lan {
+        if let Some(lan) = &mut self.lan {
             let _ = lan.set_team(None, false);
         }
         drop(team);

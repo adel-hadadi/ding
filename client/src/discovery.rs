@@ -21,6 +21,9 @@ pub struct Peer {
     pub team: Option<String>,
     /// True when this peer is the one hosting `team`.
     pub hosting: bool,
+    pub headphones: bool,
+    /// Encoded blob avatar, when the peer advertised one.
+    pub avatar: Option<String>,
     pub addr: SocketAddr,
 }
 
@@ -38,12 +41,22 @@ pub struct Lan {
     port: u16,
     name: String,
     id: String,
+    team: Option<String>,
+    hosting: bool,
+    headphones: bool,
+    avatar: String,
+}
+
+pub struct Presence {
+    pub headphones: bool,
+    pub avatar: String,
 }
 
 impl Lan {
     pub fn start(
         name: &str,
         port: u16,
+        presence: Presence,
         events: mpsc::UnboundedSender<LanEvent>,
     ) -> Result<Self, String> {
         let id = random_id();
@@ -51,27 +64,31 @@ impl Lan {
         let instance = format!("ding-{id}");
         let hostname = format!("ding-{id}.local.");
         let daemon = ServiceDaemon::new().map_err(|err| err.to_string())?;
-        let info = service_info(&Announcement {
-            instance: &instance,
-            hostname: &hostname,
-            ip: &ip,
+        let lan = Self {
+            daemon,
+            instance,
+            hostname,
+            ip,
             port,
-            name,
-            id: &id,
+            name: name.to_string(),
+            id,
             team: None,
             hosting: false,
-        })?;
+            headphones: presence.headphones,
+            avatar: presence.avatar,
+        };
+        let info = lan.service_info()?;
         let fullname = info.get_fullname().to_string();
-        daemon.register(info).map_err(|err| err.to_string())?;
+        lan.daemon.register(info).map_err(|err| err.to_string())?;
 
-        let receiver = match daemon.browse(SERVICE_TYPE) {
+        let receiver = match lan.daemon.browse(SERVICE_TYPE) {
             Ok(receiver) => receiver,
             Err(err) => {
-                let _ = daemon.shutdown();
+                let _ = lan.daemon.shutdown();
                 return Err(err.to_string());
             }
         };
-        let my_id = id.clone();
+        let my_id = lan.id.clone();
         // The daemon thread does the network I/O. This task just turns its events into
         // the same channel the UI loop already reads.
         tokio::spawn(async move {
@@ -104,73 +121,63 @@ impl Lan {
             }
         });
 
-        Ok(Self {
-            daemon,
-            instance,
-            hostname,
-            ip,
-            port,
-            name: name.to_string(),
-            id,
-        })
+        Ok(lan)
     }
 
     /// Update the announcement when we create, join, or leave a team.
     /// Registering the same instance again replaces the old record.
-    pub fn set_team(&self, team: Option<&str>, hosting: bool) -> Result<(), String> {
-        let info = service_info(&Announcement {
-            instance: &self.instance,
-            hostname: &self.hostname,
-            ip: &self.ip,
-            port: self.port,
-            name: &self.name,
-            id: &self.id,
-            team,
-            hosting,
-        })?;
+    pub fn set_team(&mut self, team: Option<&str>, hosting: bool) -> Result<(), String> {
+        self.team = team
+            .filter(|team| !team.is_empty())
+            .map(|team| team.to_string());
+        self.hosting = hosting && self.team.is_some();
+        self.reregister()
+    }
+
+    /// Update headphones / avatar without changing the team announcement.
+    pub fn set_presence(&mut self, headphones: bool, avatar: String) -> Result<(), String> {
+        self.headphones = headphones;
+        self.avatar = avatar;
+        self.reregister()
+    }
+
+    fn reregister(&mut self) -> Result<(), String> {
+        let info = self.service_info()?;
         self.daemon.register(info).map_err(|err| err.to_string())
+    }
+
+    fn service_info(&self) -> Result<ServiceInfo, String> {
+        let team = self.team.as_deref().unwrap_or("");
+        let hosting = if self.hosting && !team.is_empty() {
+            "1"
+        } else {
+            "0"
+        };
+        let hp = if self.headphones { "1" } else { "0" };
+        let properties = [
+            ("name", self.name.as_str()),
+            ("id", self.id.as_str()),
+            ("team", team),
+            ("hosting", hosting),
+            ("hp", hp),
+            ("avatar", self.avatar.as_str()),
+        ];
+        // Advertise only the default-route address. Auto-detected addresses also include
+        // virtual interfaces (VPN, bridges) that teammates often cannot route to.
+        ServiceInfo::new(
+            SERVICE_TYPE,
+            &self.instance,
+            &self.hostname,
+            self.ip.as_str(),
+            self.port,
+            &properties[..],
+        )
+        .map_err(|err| err.to_string())
     }
 
     pub fn shutdown(&self) {
         let _ = self.daemon.shutdown();
     }
-}
-
-struct Announcement<'a> {
-    instance: &'a str,
-    hostname: &'a str,
-    ip: &'a str,
-    port: u16,
-    name: &'a str,
-    id: &'a str,
-    team: Option<&'a str>,
-    hosting: bool,
-}
-
-fn service_info(announce: &Announcement<'_>) -> Result<ServiceInfo, String> {
-    let team = announce.team.unwrap_or("");
-    let hosting = if announce.hosting && !team.is_empty() {
-        "1"
-    } else {
-        "0"
-    };
-    let properties = [
-        ("name", announce.name),
-        ("id", announce.id),
-        ("team", team),
-        ("hosting", hosting),
-    ];
-    // Advertise only the default-route address. Auto-detected addresses also include
-    // virtual interfaces (VPN, bridges) that teammates often cannot route to.
-    ServiceInfo::new(
-        SERVICE_TYPE,
-        announce.instance,
-        announce.hostname,
-        announce.ip,
-        announce.port,
-        &properties[..],
-    )
-    .map_err(|err| err.to_string())
 }
 
 fn peer_from(service: &mdns_sd::ResolvedService) -> Option<Peer> {
@@ -193,6 +200,13 @@ fn peer_from(service: &mdns_sd::ResolvedService) -> Option<Peer> {
         .and_then(|team| normalize_team(team).ok());
     let hosting =
         service.txt_properties.get_property_val_str("hosting") == Some("1") && team.is_some();
+    let headphones = service.txt_properties.get_property_val_str("hp") == Some("1");
+    let avatar = service
+        .txt_properties
+        .get_property_val_str("avatar")
+        .map(str::trim)
+        .filter(|avatar| !avatar.is_empty())
+        .map(str::to_string);
     let ip = pick_ip(&service.addresses)?;
     Some(Peer {
         fullname: service.fullname.clone(),
@@ -200,6 +214,8 @@ fn peer_from(service: &mdns_sd::ResolvedService) -> Option<Peer> {
         id,
         team,
         hosting,
+        headphones,
+        avatar,
         addr: SocketAddr::new(ip, service.port),
     })
 }
